@@ -15,12 +15,12 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
   context "setup purchase" do
     
     before do
-      @partner_id = 123456
+      @login       = 123456
       @return_url  = "http://www.example.com/mollie/return"
       @report_url  = "http://www.example.com/mollie/report"
-      @bank_id     = "0031"
+      @issuer_id   = "0031"
       @description = "This is a test transaction"
-      @gateway    = ActiveMerchant::Billing::MollieIdealGateway.new(:partner_id  => @partner_id)
+      @gateway     = ActiveMerchant::Billing::MollieIdealGateway.new(:login  => @login)
     end
     
     it "should create a new purchase via the Mollie API" do
@@ -40,7 +40,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       </response>')
       
       http_mock.should_receive(:get) do |url|
-        { :partnerid => @partner_id, :returnurl => @return_url, :reporturl => @report_url, :description => CGI::escape(@description), :bank_id => @bank_id }.each do |param, value|
+        { :partnerid => @login, :returnurl => @return_url, :reporturl => @report_url, :description => CGI::escape(@description), :bank_id => @issuer_id }.each do |param, value|
           url.should include("#{param}=#{value}")
         end
         response_mock
@@ -49,7 +49,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       @response = @gateway.setup_purchase(1000, {
         :return_url       => @return_url,
         :report_url       => @report_url,
-        :bank_id          => @bank_id,
+        :issuer_id        => @issuer_id,
         :description      => @description
       })
       
@@ -61,7 +61,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       lambda {
         @gateway.setup_purchase(1000, {
           :report_url       => @report_url,
-          :bank_id          => @bank_id,
+          :issuer_id        => @issuer_id,
           :description      => @description
         })
       }.should  raise_error(ArgumentError)
@@ -71,13 +71,13 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       lambda {
         @gateway.setup_purchase(1000, {
           :return_url       => @return_url,
-          :bank_id          => @bank_id,
+          :issuer_id        => @issuer_id,
           :description      => @description
         })
       }.should  raise_error(ArgumentError)
     end
     
-    it "should not allow a purchase without a bank id" do
+    it "should not allow a purchase without an issuer id" do
       lambda {
         @gateway.setup_purchase(1000, {
           :return_url       => @return_url,
@@ -92,7 +92,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
         @gateway.setup_purchase(1000, {
           :return_url       => @return_url,
           :report_url       => @report_url,
-          :bank_id          => @bank_id
+          :issuer_id        => @issuer_id
         })
       }.should  raise_error(ArgumentError)
     end
@@ -102,7 +102,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
         @gateway.setup_purchase(179, {
           :return_url       => @return_url,
           :report_url       => @report_url,
-          :bank_id          => @bank_id,
+          :issuer_id        => @issuer_id,
           :description      => @description
         })
       }.should  raise_error(ArgumentError)
@@ -126,10 +126,10 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       @response = @gateway.setup_purchase(1000, {
         :return_url       => @return_url,
         :report_url       => @report_url,
-        :bank_id          => @bank_id,
+        :issuer_id        => @issuer_id,
         :description      => @description
       })
-      @response.success?.should be_false
+      @gateway.success?(@response).should be_false
       @response.message.should == "This is an invalid order (-10)"
     end
     
@@ -138,9 +138,9 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
   context "check details" do
     
     before do
-      @partner_id = 123456
-      @token      = "482d599bbcc7795727650330ad65fe9b"
-      @gateway    = ActiveMerchant::Billing::MollieIdealGateway.new(:partner_id  => @partner_id)
+      @login   = 123456
+      @token   = "482d599bbcc7795727650330ad65fe9b"
+      @gateway = ActiveMerchant::Billing::MollieIdealGateway.new(:login  => @login)
     end
     
     it "should return information about a successfull transaction" do
@@ -165,7 +165,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       </response>')
       
       http_mock.should_receive(:get) do |url|
-        { :partnerid => @partner_id, :transaction_id => @token }.each do |param, value|
+        { :partnerid => @login, :transaction_id => @token }.each do |param, value|
           url.should include("#{param}=#{value}")
         end
         response_mock
@@ -192,7 +192,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       </response>')
       
       http_mock.should_receive(:get) do |url|
-        { :partnerid => @partner_id, :transaction_id => @token }.each do |param, value|
+        { :partnerid => @login, :transaction_id => @token }.each do |param, value|
           url.should include("#{param}=#{value}")
         end
         response_mock
@@ -216,7 +216,7 @@ describe "Mollie iDeal implementation for ActiveMerchant" do
       </response>')
       
       http_mock.should_receive(:get) do |url|
-        { :partnerid => @partner_id, :transaction_id => @token }.each do |param, value|
+        { :partnerid => @login, :transaction_id => @token }.each do |param, value|
           url.should include("#{param}=#{value}")
         end
         response_mock

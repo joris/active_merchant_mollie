@@ -12,7 +12,24 @@ Run bundle install to install the gem.
 
 You can also install as a Rails plugin:
 
-  ./script/plugin install git://github.com/bluetools/active_merchant_mollie.git
+  ./script/plugin install git://github.com/joris/active_merchant_mollie.git
+
+Setup the gateway in the appropriate environment configuration files:
+
+config/environments/development.rb
+config/environments/test.rb
+
+  config.after_initialize do
+    ActiveMerchant::Billing::Base.mode = :test
+    ::GATEWAY = ActiveMerchant::Billing::MollieIdealGateway.new(:login  => your_partner_id)
+  end
+
+And for production use:
+config/environments/production.rb
+
+  config.after_initialize do
+    ::GATEWAY = ActiveMerchant::Billing::MollieIdealGateway.new(:login  => your_partner_id)
+  end
 
 == Usage
 
@@ -20,29 +37,28 @@ Before you start using this gem, please read the API documentation of Mollie on 
 
 === Create a new purchase
 
-  @gateway = ActiveMerchant::Billing::MollieIdealGateway.new(:partner_id  => your_partner_id)
-  @response = @gateway.setup_purchase(1000, {
+  response = GATEWAY.setup_purchase(1000, {
     :return_url       => "http://yourwebsite.com/ideal/return",
     :report_url       => "http://yourwebsite.com/ideal/report",
-    :bank_id          => bank_id,
+    :issuer_id        => bank_id,
     :description      => "Description of this transaction"
   })
   
   # Store the transaction id in your database with a reference to the original order
-  @transaction_id = @response.token
+  # @order = Order.find(params[:id])
+  # @order.payment_token = response.token
   
   # Now redirect the user to the selected bank
-  redirect_to @gateway.redirect_url_for( @response.token )
+  redirect_to @response.url
 
 === Receive details of purchase
 
 After the user returns on your website or Mollie requests you report URL, you should check the state of the purchase. Based in the transaction id you can update the state of your order in your database.
 
-  # The token usually sits in the transaction_id GET parameter
-  @token = params[:transaction_id]
+  # The token sits in the transaction_id GET parameter
+  token = params[:transaction_id]
   
-  @gateway = ActiveMerchant::Billing::MollieIdealGateway.new(:partner_id  => your_partner_id)
-  @details_response = @gateway.details_for( @token )
+  @details_response = GATEWAY.details_for( token )
   
   if @details_response.success?
     # The payment was successfull, update the state in your database

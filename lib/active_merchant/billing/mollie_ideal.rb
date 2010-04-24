@@ -6,79 +6,113 @@ module ActiveMerchant
       
       URL = "https://secure.mollie.nl/xml/ideal"
       
+      # login is your Partner ID
       def initialize(options={})
-        requires!(options, :partner_id)
+        requires!(options, :login)
         
         @options = options
       end
       
       def setup_purchase(money, options)
-        requires!(options, :return_url, :report_url, :bank_id, :description)
+        requires!(options, :return_url, :report_url, :issuer_id, :description)
         
         raise ArgumentError.new("Amount should be at least 1,80EUR") if money < 180
         
-        @response = build_response_fetch(commit("fetch", {
+        build_purchase_response(commit('fetch', {
           :amount         => money,
-          :bank_id        => options[:bank_id],
-          :description    => CGI::escape(options[:description] || ""),
-          :partnerid      => @options[:partner_id],
+          :bank_id        => options[:issuer_id],
+          :description    => options[:description],
           :reporturl      => options[:report_url],
           :returnurl      => options[:return_url]
         }))
       end
       
-      def redirect_url_for(token)
-        @response.url if @response.token == token
-      end
-      
       def details_for(token)
-        build_response_check(commit('check', {
-          :partnerid        => @options[:partner_id],
-          :transaction_id   => token,
-          :testmode         => ActiveMerchant::Billing::Base.test?
-        }))
+        build_details_response(commit('check', :transaction_id => token))
       end
       
       private
       
       def commit(action, parameters)
-        url   = URL + "?a=#{action}&#{parameters.collect { |k,v| "#{k}=#{v}" }.join("&") }"
-        uri   = URI.parse(url)
-        http  = Net::HTTP.new(uri.host, uri.port)
-        http.get(uri.request_uri).body
+        # url = URL + "?" + post_data(action, parameters)
+        # RAILS_DEFAULT_LOGGER.debug "MollieIdealGateway#commit POST url: #{url}"
+        RAILS_DEFAULT_LOGGER.debug "MollieIdealGateway#commit POST action: #{action} parameters: #{parameters.inspect}"
+        xml = ssl_post(URL, post_data(action, parameters))
+        RAILS_DEFAULT_LOGGER.debug "MollieIdealGateway#commit response XML: #{xml}"
+        parse(xml)
+      end
+
+      def post_data(action, parameters = {})
+        add_pair(parameters, :partnerid, @options[:login])
+        add_pair(parameters, :testmode, ActiveMerchant::Billing::Base.test?)
+        add_pair(parameters, :a , action)
+        parameters.collect { |key, value| "#{key}=#{CGI.escape(value.to_s)}" }.join("&")
+      end
+
+      def add_pair(post, key, value, options = {})
+        post[key] = value if !value.blank? || options[:required]
       end
       
-      def build_response_fetch(response)
-        vars = {}
-        doc = Hpricot.XML(response)
-        success = false
-        if doc.search("response/item").size > 0
-          errorcode = doc.at('response/item/errorcode').inner_text
-          message = doc.at('response/item/message').inner_text + " (#{errorcode})"
-        elsif doc.search("response/order").size > 0
-          vars = {}
-          resp = doc.at('response/order')
-          if resp && resp.at('amount') && resp.at('transaction_id') && resp.at('URL')
-            vars[:amount] = resp.at('amount').inner_text
-            vars[:transaction_id] = resp.at('transaction_id').inner_text
-            vars[:url] = resp.at('URL').inner_text
+      def success?(response)
+        if response.search('response/item[@type="error"]').size == 0 && response.search('response/order').size > 0
+          if response.at('response/order/payed')
+            response.at('response/order/payed').inner_text.downcase == "true"
+          else
+            true
           end
-          success = true
+        else
+          false
         end
-        MollieIdealFetchResponse.new(success, message, vars)
+      end
+
+      def message_from(response)
+        if response.at('response/item[@type="error"]')
+          errorcode = response.at('response/item[@type="error"]/errorcode').inner_text
+          response.at('response/item[@type="error"]/message').inner_text + " (#{errorcode})"
+        else
+          response.at('response/order/message').inner_text
+        end
       end
       
-      def build_response_check(response)
-        doc = Hpricot.XML(response)
-        success = false
-        if doc.search("response/item").size > 0
-          errorcode = doc.at('response/item/errorcode').inner_text
-          message = doc.at('response/item/message').inner_text + " (#{errorcode})"      
-        elsif doc.search("response/order").size > 0
-          resp = doc.at('response/order')
-          success = resp && resp.at('payed') && resp.at('payed').inner_text.downcase == "true"
+      def parse(xml)
+        Hpricot.XML(xml)
+      end
+      
+      def build_purchase_response(response)
+        vars = {}
+        if success?(response)
+          options = {}
+          order = response.at('response/order')
+          if order && order.at('amount') && order.at('transaction_id') && order.at('URL')
+            options[:amount]   = order.at('amount').inner_text
+            options[:currency] = order.at('currency').inner_text
+            options[:token]    = order.at('transaction_id').inner_text
+            options[:url]      = order.at('URL').inner_text
+          end
         end
-        MollieIdealCheckResponse.new(success, message)
+        MollieIdealPurchaseResponse.new(success?(response), message_from(response), options)
+      end
+      
+      def build_details_response(response)
+        options = {}
+        order   = response.at('response/order')
+        
+        if order
+          options[:amount]   = order.at('amount').inner_text
+          options[:currency] = order.at('currency').inner_text
+          options[:token]    = order.at('transaction_id').inner_text
+          options[:paid]     = order.at('payed').inner_text == "true"
+        
+          customer = order.at('customer')
+          
+          if customer
+            options[:account_holder] = customer.at('customer_name').inner_text
+            options[:account_number] = customer.at('customer_account').inner_text
+            options[:account_city]   = customer.at('customer_city').inner_text
+          end
+        end
+        
+        MollieIdealDetailsResponse.new(success?(response), message_from(response), options)
       end
       
     end

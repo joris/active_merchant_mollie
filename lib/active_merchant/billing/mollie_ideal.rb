@@ -106,9 +106,9 @@ module ActiveMerchant
           consumer = order.at('consumer')
           
           if consumer
-            options[:account_holder] = consumer.at('consumer_name').inner_text
-            options[:account_number] = consumer.at('consumer_account').inner_text
-            options[:account_city]   = consumer.at('consumer_city').inner_text
+            options[:account_holder] = consumer.at('consumerName').inner_text
+            options[:account_number] = consumer.at('consumerAccount').inner_text
+            options[:account_city]   = consumer.at('consumerCity').inner_text
           end
         end
         

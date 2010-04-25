@@ -103,12 +103,12 @@ module ActiveMerchant
           options[:token]    = order.at('transaction_id').inner_text
           options[:paid]     = order.at('payed').inner_text == "true"
         
-          customer = order.at('customer')
+          consumer = order.at('consumer')
           
-          if customer
-            options[:account_holder] = customer.at('customer_name').inner_text
-            options[:account_number] = customer.at('customer_account').inner_text
-            options[:account_city]   = customer.at('customer_city').inner_text
+          if consumer
+            options[:account_holder] = consumer.at('consumer_name').inner_text
+            options[:account_number] = consumer.at('consumer_account').inner_text
+            options[:account_city]   = consumer.at('consumer_city').inner_text
           end
         end
         

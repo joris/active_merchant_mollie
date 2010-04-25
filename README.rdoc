@@ -44,12 +44,12 @@ Before you start using this gem, please read the API documentation of Mollie on 
     :description      => "Description of this transaction"
   })
   
-  # Store the transaction id in your database with a reference to the original order
+  # Store the transaction token in the order:
   # @order = Order.find(params[:id])
   # @order.payment_token = response.token
   
   # Now redirect the user to the selected bank
-  redirect_to @response.url
+  redirect_to response.url
 
 === Receive details of purchase
 
